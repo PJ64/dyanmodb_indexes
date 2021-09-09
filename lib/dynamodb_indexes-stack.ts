@@ -77,7 +77,7 @@ export class DynamodbIndexesStack extends Stack {
     const query_accountid_orderdate = new Function(this, "query_accountid_orderdate", {
       runtime: Runtime.PYTHON_3_7,
       handler: "lambda_handler.lambda_handler",
-      code: Code.fromAsset("resources/query_accountid_orderdate copy"),
+      code: Code.fromAsset("resources/query_accountid_orderdate"),
       functionName: "dynamodb_indexes_query_accountid_orderdate",
       role: lambda_service_role,
       environment: {
