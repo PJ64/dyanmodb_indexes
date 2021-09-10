@@ -46,7 +46,6 @@ Sort key = orderdate
 5. The final script invokes a Lambda function that queries a global secondary index, which is partitioned by vendorid and has a sort key on orderdate. The query filters orders by vendorid and a datetime range.
 
 
-
 ## Setup
 
 1. The following prerequisities are required for this example
