@@ -1,15 +1,25 @@
 ## Example
-This example deploys an Amazon API Gateway, AWS Lambda functions and an Amazon DynamoDB table with two indexes. The example demostrates using DynamoDB indexes to support the differant data patterns of the microservice.
+This example deploys an Amazon API Gateway, multiple AWS Lambda functions and an Amazon DynamoDB table with two indexes. The example demonstrates using DynamoDB indexes to support the differant query patterns of a microservice. 
 
-The Amazon DynamoDB table is partitioned on the accountid attribute and also includes a sort key on the vendorid attribute, together they form the primary key. 
+The Amazon DynamoDB table is partitioned on the accountid attribute and it also includes a sort key on the vendorid attribute, together they form the primary key. 
 
-The local secondary index is partitioned on the accountid attribute, same as the base table, which is a requirement for this type of index. The orderdate attribute has been used as the sort key.
+The sort key on the base table allows records to be scanned using the vendorid.
 
-The global seondary index is partitioned on vendorid and orderdate is used as the sort key. The global secondary index partition key does not need to be the same as the base table. 
+The local secondary index is partitioned on the accountid attribute, the same as the base table, which is a requirement for this type of index. The orderdate attribute has been used as the sort key. This allows us to find orders using accountid and a datetime range. For example we can query for customer orders on a particular day.
 
-1. The first command will write items to the DynamoDB table.
+The global seondary index is partitioned on vendorid and orderdate is used as the sort key. The global secondary index partition key does not need to be the same as the base table. This index allows orders to be queried using vendorid and a datetime range. For example we can find the most recent vendor orders.
 
-2. The second script will get items using a scan operation using the base table sort key.
+**Jupyter Notebook Scripts**
+
+1. The first script generates new orders and them the API Gateway. The gateway invokes a Lambda function which writes the items to the DynamoDB table.
+
+2. The second script is the json formatter used to render output
+
+3. The third script will invoke a function that uses a scan operation against the sort key of the base table, this will return items with matching vendorid
+
+4. The fourth script invokes a function that queries a global secondary index, which is partitioned by accountid and has a sort key on orderdate. The query filters orders by accountid and a datetime range.
+
+5. The final script invokes a Lambda function that queries a global secondary index, which is partitioned by vendorid and has a sort key on orderdate. The query filters orders by vendorid and a datetime range.
 
 **Base Table**
 
@@ -17,7 +27,7 @@ Partition key = accountid
 
 Sort key = vendorid
 
-3. The third script will get items using a query operation against the local secondary index using an accountid and orderdate range.
+1. The third script will get items using a query operation against the local secondary index using an accountid and orderdate range.
 
 **Local Secondary Index**
 

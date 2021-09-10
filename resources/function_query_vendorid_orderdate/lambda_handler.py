@@ -15,7 +15,7 @@ def lambda_handler(event, context):
     
     try:
         pe = "vendorid,accountid,details"
-        response = table.query(IndexName='gsi-vendorid_orderdate',KeyConditionExpression=Key('vendorid').eq(queryParam["vendorid"]) & Key('orderdate').between(queryParam["from"],queryParam["to"]),ProjectionExpression=pe)
+        response = table.query(IndexName='gsi_vendorid_orderdate',KeyConditionExpression=Key('vendorid').eq(queryParam["vendorid"]) & Key('orderdate').between(queryParam["from"],queryParam["to"]),ProjectionExpression=pe)
 
         return {
             'statusCode': 200,

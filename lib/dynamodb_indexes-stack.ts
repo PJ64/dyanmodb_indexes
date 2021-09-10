@@ -8,7 +8,7 @@ export class DynamodbIndexesStack extends Stack {
   constructor(scope: App, id: string) {
     super(scope, id);
 
-    //Create DynamoDB table
+    //Create DynamoDB table to hold the orders
     const dynamoTable = new Table(this, "DynamoDBTable", {
       partitionKey: {
         name: 'accountid',
@@ -22,9 +22,9 @@ export class DynamodbIndexesStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY
     });
 
-    //DynamoDB local secondary indexes
+    //DynamoDB local secondary index with accountid as the partition key and orderdate as the sortkey
     dynamoTable.addLocalSecondaryIndex({
-      indexName: 'lsi-accountid_orderdate',
+      indexName: 'lsi_accountid_orderdate',
       sortKey: {
         name: 'orderdate',
         type: AttributeType.STRING
@@ -33,9 +33,9 @@ export class DynamodbIndexesStack extends Stack {
       projectionType: ProjectionType.INCLUDE
     });
 
-    //DynamoDB global secondary indexes
+    //DynamoDB global secondary index with vendorid as the partition key and orderdate as the sortkey
     dynamoTable.addGlobalSecondaryIndex({
-      indexName: 'gsi-vendorid_orderdate',
+      indexName: 'gsi_vendorid_orderdate',
       partitionKey: {
         name: 'vendorid',
         type: AttributeType.STRING
@@ -48,50 +48,86 @@ export class DynamodbIndexesStack extends Stack {
       projectionType: ProjectionType.INCLUDE
     });
     
-    //Setup IAM security for Lambda
-    const lambda_service_role = new Role(this, "IamRole", {
+    //Setup IAM security for Lambda functions
+    //Lambda role used to put_item to dynamodb
+    const lambda_service_role_put = new Role(this, "lambda_service_role_put", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      roleName: "dynamodb_indexes"
+      roleName: "dynamodb_indexes_put"
     });
+    lambda_service_role_put.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"));
 
-    lambda_service_role.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"));
-
-    lambda_service_role.addToPolicy(new PolicyStatement({
+    lambda_service_role_put.addToPolicy(new PolicyStatement({
       resources: [dynamoTable.tableArn,`${dynamoTable.tableArn}/index/*`],
-      actions: ['dynamodb:PutItem', 'dynamodb:GetItem','dynamodb:Scan','dynamodb:Query'],
+      actions: ['dynamodb:PutItem'],
     }));
 
-    //Create a Lambda function to generate orders
-    const lambda_post_order = new Function(this, "CreateOrdersLambdaFunction", {
+    //Lambda role used to get_item to dynamodb
+    const lambda_service_role_scan = new Role(this, "lambda_service_role_scan", {
+      assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      roleName: "dynamodb_indexes_scan"
+    });
+    lambda_service_role_scan.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"));
+
+    lambda_service_role_scan.addToPolicy(new PolicyStatement({
+      resources: [dynamoTable.tableArn,`${dynamoTable.tableArn}/index/*`],
+      actions: ['dynamodb:Scan'],
+    }));
+
+    //Lambda role to query global secondary index
+    const lambda_service_role_gsi_query = new Role(this, "lambda_service_role_gsi_query", {
+      assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      roleName: "dynamodb_indexes_gsi_query"
+    });
+    lambda_service_role_gsi_query.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"));
+
+    lambda_service_role_gsi_query.addToPolicy(new PolicyStatement({
+      resources: [dynamoTable.tableArn,`${dynamoTable.tableArn}/index/*`],
+      actions: ['dynamodb:GetItem','dynamodb:Scan','dynamodb:Query'],
+    }));
+
+    //Lambda role to query local secondary index
+    const lambda_service_role_lsi_query = new Role(this, "lambda_service_role_lsi_query", {
+      assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      roleName: "dynamodb_indexes_lsi_query"
+    });
+    lambda_service_role_lsi_query.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"));
+
+    lambda_service_role_lsi_query.addToPolicy(new PolicyStatement({
+      resources: [dynamoTable.tableArn,`${dynamoTable.tableArn}/index/*`],
+      actions: ['dynamodb:GetItem','dynamodb:Scan','dynamodb:Query'],
+    }));
+
+    //Create a Lambda function used to put items into dynamodb
+    const lambda_put_order = new Function(this, "lambda_put_order", {
       runtime: Runtime.PYTHON_3_7,
       handler: "lambda_handler.lambda_handler",
-      code: Code.fromAsset("resources/post_order"),
-      functionName: "dynamodb_indexes_post",
-      role: lambda_service_role,
+      code: Code.fromAsset("resources/function_put_order"),
+      functionName: "dynamodb_indexes_put",
+      role: lambda_service_role_put,
       environment: {
         'TABLENAME': dynamoTable.tableName
       }
     });
 
-    //Query orders by accountid and order date using local secondary index
+    //Query orders by accountid and orderdate using local secondary index
     const query_accountid_orderdate = new Function(this, "query_accountid_orderdate", {
       runtime: Runtime.PYTHON_3_7,
       handler: "lambda_handler.lambda_handler",
-      code: Code.fromAsset("resources/query_accountid_orderdate"),
+      code: Code.fromAsset("resources/function_query_accountid_orderdate"),
       functionName: "dynamodb_indexes_query_accountid_orderdate",
-      role: lambda_service_role,
+      role: lambda_service_role_lsi_query,
       environment: {
         'TABLENAME': dynamoTable.tableName
       }
     });
 
-    //Query orders by vendorid and order date using global secondary index
+    //Query orders by vendorid and orderdate using global secondary index
     const query_vendorid_orderdate = new Function(this, "query_vendorid_orderdate", {
       runtime: Runtime.PYTHON_3_7,
       handler: "lambda_handler.lambda_handler",
-      code: Code.fromAsset("resources/query_vendorid_orderdate"),
+      code: Code.fromAsset("resources/function_query_vendorid_orderdate"),
       functionName: "dynamodb_indexes_query_vendorid_orderdate",
-      role: lambda_service_role,
+      role: lambda_service_role_gsi_query,
       environment: {
         'TABLENAME': dynamoTable.tableName
       }
@@ -101,9 +137,9 @@ export class DynamodbIndexesStack extends Stack {
     const scan_orders_vid = new Function(this, "ScanLambdaFunction", {
       runtime: Runtime.PYTHON_3_7,
       handler: "lambda_handler.lambda_handler",
-      code: Code.fromAsset("resources/scan_vendorid"),
+      code: Code.fromAsset("resources/function_scan_vendorid"),
       functionName: "dynamodb_indexes_scan_vendorid",
-      role: lambda_service_role,
+      role: lambda_service_role_scan,
       environment: {
         'TABLENAME': dynamoTable.tableName
       }
@@ -118,7 +154,7 @@ export class DynamodbIndexesStack extends Stack {
       }
     });
 
-    var lambda_post_integration = new LambdaIntegration(lambda_post_order, {
+    var lambda_post_integration = new LambdaIntegration(lambda_put_order, {
       requestTemplates: {
         ["application/json"]: "{ \"statusCode\": \"200\" }"
       }
