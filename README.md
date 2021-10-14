@@ -9,6 +9,8 @@ The local secondary index is partitioned on the accountid attribute, the same as
 
 The global seondary index is partitioned on vendorid and orderdate is used as the sort key. The global secondary index partition key does not need to be the same as the base table. This index allows orders to be queried using vendorid and a datetime range. For example we can find the most recent vendor orders.
 
+![architecture](./images/architecture_2.png "Architecture")
+
 **Base Table**
 
 Partition key = accountid
@@ -31,22 +33,9 @@ Partition key = vendorid
 
 Sort key = orderdate
 
-![architecture](./images/architecture_1.png "Architecture")
-
-**Jupyter Notebook Scripts**
-
-1. The first script generates new orders and them the API Gateway. The gateway invokes a Lambda function which writes the items to the DynamoDB table.
-
-2. The second script is the json formatter used to render output
-
-3. The third script will invoke a function that uses a scan operation against the sort key of the base table, this will return items with matching vendorid
-
-4. The fourth script invokes a function that queries a global secondary index, which is partitioned by accountid and has a sort key on orderdate. The query filters orders by accountid and a datetime range.
-
-5. The final script invokes a Lambda function that queries a global secondary index, which is partitioned by vendorid and has a sort key on orderdate. The query filters orders by vendorid and a datetime range.
-
-
 ## Setup
+
+[Getting started with AWS CDK](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html)
 
 1. The following prerequisities are required for this example
   
